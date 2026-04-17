@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seating Chart Generator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#e9ecef;display:flex;height:100vh;overflow:hidden;user-select:none}
+
+/* MODE TABS at very top */
+#mode-tabs{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;background:#2c3e50;height:36px}
+#mode-tabs button{flex:1;border:none;background:none;color:#aab;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.5px;border-bottom:3px solid transparent;transition:all 0.2s}
+#mode-tabs button.active{color:#fff;border-bottom-color:#4A90D9;background:rgba(255,255,255,0.05)}
+#mode-tabs button:hover{color:#ddd}
+
+/* ORCHESTRA MODE */
+#orchestra-mode{display:flex;width:100%;height:calc(100vh - 36px);margin-top:36px}
+#orch-bank{width:270px;min-width:270px;background:#fff;border-right:1px solid #bbb;display:flex;flex-direction:column;height:100%}
+#orch-bank-header{padding:12px 14px;border-bottom:1px solid #ddd;background:#f8f8f8}
+#orch-bank-header h2{font-size:15px;color:#333;margin-bottom:8px}
+.bh-label{font-size:12px;color:#555;display:block;margin-bottom:2px}
+#orch-bank-header select{width:100%;padding:4px 8px;margin:0 0 6px;border:1px solid #ccc;border-radius:4px;font-size:13px}
+.bh-row{display:flex;gap:4px;align-items:center;margin-bottom:4px}
+.bh-row input[type=number]{width:50px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px}
+.bh-row button,.wind-btn{padding:5px 10px;border:1px solid #aaa;border-radius:4px;background:#fff;cursor:pointer;font-size:12px}
+.bh-row button:hover,.wind-btn:hover{background:#e8e8e8}
+.orch-tab-bar{display:flex;border-bottom:2px solid #ddd;margin-top:4px}
+.orch-tab-bar button{flex:1;padding:6px 0;border:none;background:none;cursor:pointer;font-size:12px;font-weight:600;color:#888;border-bottom:2px solid transparent;margin-bottom:-2px}
+.orch-tab-bar button.active{color:#4A90D9;border-bottom-color:#4A90D9}
+#orch-bank-items{flex:1;overflow-y:auto;padding:10px}
+.bank-group-header{font-size:12px;font-weight:bold;color:#555;margin:8px 4px 2px;border-bottom:1px solid #eee;padding-bottom:2px}
+.bank-desk,.bank-wind{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;margin:3px;border:2px solid #999;border-radius:6px;cursor:grab;font-size:11px;font-weight:600;background:#fff;position:relative}
+.bank-desk:active,.bank-wind:active{cursor:grabbing}
+.bank-desk .swatch,.bank-wind .swatch{width:10px;height:10px;border-radius:2px;border:1px solid #555}
+.bank-desk .remove-bank,.bank-wind .remove-bank{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:#e55;color:#fff;font-size:10px;line-height:16px;text-align:center;cursor:pointer;display:none;border:none}
+.bank-desk:hover .remove-bank,.bank-wind:hover .remove-bank{display:block}
+.help-text{font-size:11px;color:#888;margin-top:6px;line-height:1.4}
+
+#orch-main{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden}
+#orch-toolbar{padding:6px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,0.95);border-bottom:1px solid #ccc;z-index:10}
+#orch-toolbar label{color:#555;font-size:13px}
+#orch-toolbar input[type=text]{padding:3px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;width:200px}
+.tb-btn{padding:4px 10px;border:1px solid #aaa;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;white-space:nowrap}
+.tb-btn:hover{background:#e8e8e8}
+.sep{width:1px;height:20px;background:#ccc}
+.cb-row{display:flex;align-items:center;gap:4px}
+.cb-row input{margin:0}
+.cb-row label{font-size:12px;color:#555;white-space:nowrap}
+#orch-canvas-wrap{flex:1;position:relative}
+#orch-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+#orch-trash{position:absolute;bottom:0;left:0;right:0;height:50px;background:repeating-linear-gradient(45deg,#f8d7da,#f8d7da 10px,#f5c6cb 10px,#f5c6cb 20px);border-top:2px dashed #c0392b;display:flex;align-items:center;justify-content:center;z-index:5;opacity:0.3;transition:opacity 0.2s;pointer-events:none}
+#orch-trash.active{opacity:1}
+#orch-trash span{font-size:14px;font-weight:bold;color:#922;pointer-events:none}
+#orch-tooltip{position:absolute;pointer-events:none;background:rgba(0,0,0,0.8);color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;display:none;z-index:100;white-space:nowrap}
+#orch-name-editor{position:absolute;z-index:50;background:#fff;border:1px solid #999;border-radius:6px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,0.2);display:none;min-width:220px;max-width:280px}
+#orch-name-editor h4{font-size:13px;margin-bottom:6px}
+#orch-name-editor input[type=text]{width:100%;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:12px;margin-bottom:4px}
+#orch-name-editor input[type=number]{width:55px;padding:3px 6px;border:1px solid #ccc;border-radius:3px;font-size:12px}
+#orch-name-editor .ne-row{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+#orch-name-editor .ne-row label{font-size:11px;color:#888;min-width:55px}
+#orch-name-editor button{padding:3px 8px;border:1px solid #aaa;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;margin-top:2px}
+#orch-name-editor .ne-section{border-top:1px solid #eee;margin-top:6px;padding-top:6px}
+#orch-name-editor .ne-section-title{font-size:11px;font-weight:600;color:#666;margin-bottom:4px}
+
+/* WIND ENSEMBLE MODE */
+#wind-mode{display:none;width:100%;height:calc(100vh - 36px);margin-top:36px;flex-direction:row}
+#wind-sidebar{width:300px;min-width:300px;background:#fff;border-right:1px solid #bbb;overflow-y:auto;padding:14px}
+#wind-sidebar h2{font-size:15px;color:#333;margin-bottom:10px;border-bottom:2px solid #4A90D9;padding-bottom:6px}
+#wind-sidebar label{font-size:13px;color:#555;display:block;margin-bottom:2px}
+#wind-sidebar input[type=text],#wind-sidebar input[type=number]{width:100%;padding:4px 8px;margin:0 0 8px;border:1px solid #ccc;border-radius:4px;font-size:13px}
+#wind-sidebar textarea{width:100%;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:12px;margin:0 0 8px;resize:vertical;height:60px}
+.wind-row-panel{border:1px solid #ddd;border-radius:4px;margin:6px 0;padding:8px;background:#fafafa}
+.wind-row-panel .wrp-header{display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.wind-row-panel .wrp-header h4{font-size:13px;margin:0}
+.wind-row-panel .wrp-body{display:none;margin-top:6px}
+.wind-row-panel.open .wrp-body{display:block}
+.wind-row-panel .wrp-body label{font-size:12px}
+.wind-row-panel .wrp-body input[type=number]{width:60px;display:inline-block}
+.wind-row-panel .wrp-body textarea{height:50px;font-size:11px}
+.wrp-remove{background:none;border:none;color:#c00;font-size:16px;cursor:pointer;padding:0 4px}
+.wind-sep{border:none;border-top:1px solid #ddd;margin:10px 0}
+.wind-slider-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.wind-slider-row input[type=range]{flex:1}
+.wind-slider-row span{font-size:12px;min-width:35px}
+.wind-action-links{margin-top:12px;font-size:13px}
+.wind-action-links a{color:#4A90D9;text-decoration:none;margin-right:10px;cursor:pointer}
+.wind-action-links a:hover{text-decoration:underline}
+#wind-main{flex:1;display:flex;flex-direction:column;align-items:center;padding:20px;overflow:auto}
+#wind-title-display{font-size:22px;font-weight:bold;color:#333;margin-bottom:10px}
+#wind-canvas-wrap{background:#fff;border:1px solid #ccc;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+#wind-canvas{display:block}
+#wind-notes-display{margin-top:10px;font-size:13px;color:#555;max-width:960px;text-align:center;white-space:pre-wrap}
+
+@media print{
+  #mode-tabs,#orch-bank,#orch-toolbar,#orch-trash,#orch-tooltip,#orch-name-editor,#wind-sidebar{display:none!important}
+  body{background:#fff}
+  #orchestra-mode,#wind-mode{margin-top:0;height:auto}
+  #orch-main{position:static}
+  #orch-canvas-wrap{position:static}
+  #orch-canvas{position:static}
+  #wind-main{padding:0}
+  #wind-canvas-wrap{border:none;box-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<div id="mode-tabs">
+  <button class="active" onclick="switchMode('orchestra',this)">🎻 Orchestra</button>
+  <button onclick="switchMode('wind',this)">🎺 Wind Ensemble</button>
+</div>
+
+<!-- ==================== ORCHESTRA MODE ==================== -->
+<div id="orchestra-mode">
+  <div id="orch-bank">
+    <div id="orch-bank-header">
+      <h2>🎻 Instrument Bank</h2>
+      <div class="orch-tab-bar">
+        <button class="active" onclick="orchSwitchTab('strings',this)">Strings</button>
+        <button onclick="orchSwitchTab('winds',this)">Winds/Brass/Perc</button>
+      </div>
+      <div id="orch-add-strings" style="margin-top:8px">
+        <span class="bh-label">Section:</span>
+        <select id="orch-str-section"><option>Violin I</option><option>Violin II</option><option>Viola</option><option>Cello</option><option>Bass</option></select>
+        <div class="bh-row"><span class="bh-label" style="margin:0">Qty:</span><input type="number" id="orch-str-qty" value="1" min="1" max="20"><button onclick="orchCreateDesks()">+ Add</button></div>
+        <div class="help-text">Drag onto stage. Double-click to edit.<br>Drag to trash to remove.</div>
+      </div>
+      <div id="orch-add-winds" style="margin-top:8px;display:none">
+        <span class="bh-label">Instrument:</span>
+        <select id="orch-wind-section"><option>Flute</option><option>Oboe</option><option>Clarinet</option><option>Bassoon</option><option>Horn</option><option>Trumpet</option><option>Trombone</option><option>Tuba</option><option>Percussion</option><option>Harp</option><option>Piano</option></select>
+        <div class="bh-row"><span class="bh-label" style="margin:0">Qty:</span><input type="number" id="orch-wind-qty" value="1" min="1" max="20"><button onclick="orchCreateWinds()">+ Add</button></div>
+        <div class="help-text">Double-click to edit & link stands.</div>
+      </div>
+    </div>
+    <div id="orch-bank-items"></div>
+  </div>
+  <div id="orch-main">
+    <div id="orch-toolbar">
+      <label>Title:</label><input type="text" id="orch-title" value="Orchestra Seating Chart">
+      <div class="sep"></div>
+      <div class="cb-row"><input type="checkbox" id="o-stands" checked><label for="o-stands">Stands</label></div>
+      <div class="cb-row"><input type="checkbox" id="o-numbers" checked><label for="o-numbers">Numbers</label></div>
+      <div class="cb-row"><input type="checkbox" id="o-labels" checked><label for="o-labels">Labels</label></div>
+      <div class="cb-row"><input type="checkbox" id="o-tags" checked><label for="o-tags">Tags</label></div>
+      <div class="sep"></div>
+      <button class="tb-btn" onclick="orchSave()">💾</button>
+      <button class="tb-btn" onclick="orchLoad()">📂</button>
+      <button class="tb-btn" onclick="window.print()">🖨</button>
+      <button class="tb-btn" onclick="orchClear()">🗑</button>
+      <input type="file" id="orch-load-file" style="display:none" accept=".json">
+    </div>
+    <div id="orch-canvas-wrap">
+      <canvas id="orch-canvas"></canvas>
+      <div id="orch-trash"><span>🗑 Drag here to remove</span></div>
+    </div>
+  </div>
+  <div id="orch-tooltip"></div>
+  <div id="orch-name-editor"><h4 id="one-title">Edit</h4><div id="one-fields"></div><button onclick="orchCloseEditor()">Done</button></div>
+</div>
+
+<!-- ==================== WIND ENSEMBLE MODE ==================== -->
+<div id="wind-mode">
+  <div id="wind-sidebar">
+    <h2>🎺 Wind Ensemble</h2>
+    <label>Chart Title:</label>
+    <input type="text" id="wind-title" value="Wind Ensemble Seating Chart">
+    <label>Notes:</label>
+    <textarea id="wind-notes" placeholder="Notes appear below chart when printed..."></textarea>
+    <hr class="wind-sep">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <strong style="font-size:13px">Rows</strong>
+      <button class="wind-btn" onclick="windAddRow()">+ Add Row</button>
+    </div>
+    <div id="wind-row-panels"></div>
+    <hr class="wind-sep">
+    <div class="cb-row"><input type="checkbox" id="w-numbers" checked onchange="windDraw()"><label for="w-numbers">Show numbers on seats</label></div>
+    <div class="cb-row"><input type="checkbox" id="w-restart-nums" onchange="windDraw()"><label for="w-restart-nums">Restart numbers each row</label></div>
+    <div class="cb-row"><input type="checkbox" id="w-row-letters" onchange="windDraw()"><label for="w-row-letters">Give each row a letter</label></div>
+    <div class="cb-row"><input type="checkbox" id="w-stands" onchange="windDraw()"><label for="w-stands">Show music stands</label></div>
+    <div class="cb-row"><input type="checkbox" id="w-flip" onchange="windDraw()"><label for="w-flip">Flip chart</label></div>
+    <div class="wind-slider-row">
+      <label>Straight rows:</label>
+      <input type="range" id="w-straight" min="0" max="100" value="0" oninput="document.getElementById('w-straight-val').textContent=this.value;windDraw()">
+      <span id="w-straight-val">0</span>
+    </div>
+    <div class="wind-slider-row">
+      <label>Seat size:</label>
+      <input type="range" id="w-size" min="50" max="150" value="100" oninput="document.getElementById('w-size-val').textContent=this.value+'%';windDraw()">
+      <span id="w-size-val">100%</span>
+    </div>
+    <hr class="wind-sep">
+    <div class="wind-action-links">
+      <a onclick="windSave()">💾 Save</a>
+      <a onclick="windLoadClick()">📂 Load</a>
+      <a onclick="window.print()">🖨 Print</a>
+    </div>
+    <input type="file" id="wind-load-file" style="display:none" accept=".json">
+  </div>
+  <div id="wind-main">
+    <div id="wind-title-display">Wind Ensemble Seating Chart</div>
+    <div id="wind-canvas-wrap">
+      <canvas id="wind-canvas" width="960" height="640"></canvas>
+    </div>
+    <div id="wind-notes-display"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// MODE SWITCHING
+// ============================================================
+let currentMode='orchestra';
+function switchMode(mode,btn){
+  currentMode=mode;
+  document.querySelectorAll('#mode-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('orchestra-mode').style.display=mode==='orchestra'?'flex':'none';
+  document.getElementById('wind-mode').style.display=mode==='wind'?'flex':'none';
+  if(mode==='orchestra'){orchResize();orchDraw();}
+  else{windBuildPanels();windDraw();}
+}
+
+// ============================================================
+//  ██████  ██████   ██████ ██   ██ ███████ ███████ ████████ ██████   █████
+// ██    ██ ██   ██ ██      ██   ██ ██      ██         ██    ██   ██ ██   ██
+// ██    ██ ██████  ██      ███████ █████   ███████    ██    ██████  ███████
+// ██    ██ ██   ██ ██      ██   ██ ██           ██    ██    ██   ██ ██   ██
+//  ██████  ██   ██  ██████ ██   ██ ███████ ███████    ██    ██   ██ ██   ██
+// ============================================================
+const OC={
+  'Violin I':'#4A90D9','Violin II':'#7B68EE','Viola':'#50C878','Cello':'#FFB347','Bass':'#FF6B6B',
+  'Flute':'#87CEEB','Oboe':'#DDA0DD','Clarinet':'#F0E68C','Bassoon':'#D2B48C','Horn':'#CD853F',
+  'Trumpet':'#FF7F50','Trombone':'#BC8F8F','Tuba':'#A0522D','Percussion':'#C0C0C0','Harp':'#E6E6FA','Piano':'#FFDAB9'
+};
+let oc,octx,oW,oH,oCx,oCy,oR;
+let oBounds=[],oSecNames=['Violin I','Violin II','Viola','Cello'],oSecColors=['#4A90D9','#7B68EE','#50C878','#FFB347'];
+let oBassR=0;
+let oDesks=[],oWinds=[],oNid=1;
+let oBankStr=[],oBankWnd=[],oBnid=1;
+let oTab='strings';
+let oDragItem=null,oDragKind=null,oDragPlaced=null,oDragPKind=null,oDragOff={x:0,y:0};
+let oDragH=-1,oDragR=false,oDragB=false;
+let oHovH=-1,oHovI=-1,oHovK=null,oHovR=false,oHovB=false,oIsDrag=false;
+
+function orchInit(){
+  oc=document.getElementById('orch-canvas');octx=oc.getContext('2d');
+  orchResize();window.addEventListener('resize',orchResize);
+  for(let i=0;i<=4;i++)oBounds.push(Math.PI-i*(Math.PI/4));
+
+  [{s:'Violin I',q:6},{s:'Violin II',q:5},{s:'Viola',q:4},{s:'Cello',q:4},{s:'Bass',q:3}].forEach(p=>{
+    for(let i=0;i<p.q;i++)oBankStr.push({id:oBnid++,section:p.s,names:['',''],color:OC[p.s],cs:20});
+  });
+  orchBuildBank();
+
+  oc.addEventListener('mousedown',orchDown);oc.addEventListener('mousemove',orchMove);
+  oc.addEventListener('mouseup',orchUp);oc.addEventListener('dblclick',orchDbl);
+  oc.addEventListener('contextmenu',e=>e.preventDefault());
+  ['o-stands','o-numbers','o-labels','o-tags'].forEach(id=>document.getElementById(id).addEventListener('change',orchDraw));
+  document.getElementById('orch-title').addEventListener('input',orchDraw);
+  document.getElementById('orch-load-file').addEventListener('change',orchOnLoad);
+  orchDraw();
+}
+
+function orchResize(){
+  const c=document.getElementById('orch-canvas-wrap');
+  oW=c.clientWidth;oH=c.clientHeight;oc.width=oW;oc.height=oH;
+  oCx=oW/2;oCy=(oH-50)*0.93;
+  if(!oR){oR=Math.min(oW*0.44,(oH-50)*0.82);oBassR=oR*0.6;}
+  orchDraw();
+}
+
+function orchSwitchTab(t,btn){
+  oTab=t;document.querySelectorAll('.orch-tab-bar button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  document.getElementById('orch-add-strings').style.display=t==='strings'?'block':'none';
+  document.getElementById('orch-add-winds').style.display=t==='winds'?'block':'none';
+  orchBuildBank();
+}
+
+function orchBuildBank(){
+  const c=document.getElementById('orch-bank-items');c.innerHTML='';
+  const list=oTab==='strings'?oBankStr:oBankWnd;
+  const g={};list.forEach(d=>{if(!g[d.section])g[d.section]=[];g[d.section].push(d);});
+  Object.keys(g).forEach(sec=>{
+    const h=document.createElement('div');h.className='bank-group-header';h.textContent=sec+' ('+g[sec].length+')';c.appendChild(h);
+    g[sec].forEach(item=>{
+      const cls=oTab==='strings'?'bank-desk':'bank-wind';
+      const icon=oTab==='strings'?'🎵🎵':'🎵';
+      const el=document.createElement('div');el.className=cls;el.style.borderColor=item.color;
+      el.innerHTML=`<span class="swatch" style="background:${item.color}"></span>${icon} ${item.section}<button class="remove-bank">✕</button>`;
+      el.querySelector('.remove-bank').addEventListener('click',e=>{
+        e.stopPropagation();
+        if(oTab==='strings')oBankStr=oBankStr.filter(d=>d.id!==item.id);else oBankWnd=oBankWnd.filter(d=>d.id!==item.id);
+        orchBuildBank();
+      });
+      el.addEventListener('mousedown',e=>{if(e.button!==0)return;e.preventDefault();orchStartDrag(item,oTab==='strings'?'string':'wind',e);});
+      c.appendChild(el);
+    });
+  });
+}
+
+function orchCreateDesks(){
+  const sec=document.getElementById('orch-str-section').value;
+  const qty=parseInt(document.getElementById('orch-str-qty').value)||1;
+  for(let i=0;i<qty;i++)oBankStr.push({id:oBnid++,section:sec,names:['',''],color:OC[sec],cs:20});
+  orchBuildBank();
+}
+function orchCreateWinds(){
+  const sec=document.getElementById('orch-wind-section').value;
+  const qty=parseInt(document.getElementById('orch-wind-qty').value)||1;
+  for(let i=0;i<qty;i++)oBankWnd.push({id:oBnid++,section:sec,name:'',color:OC[sec]||'#AAA',cs:18});
+  orchBuildBank();
+}
+
+function orchRecompute(){
+  const g={};oWinds.forEach(w=>{if(!g[w.section])g[w.section]=[];g[w.section].push(w);});
+  Object.keys(g).forEach(s=>{g[s].sort((a,b)=>a.id-b.id);g[s].forEach((w,i)=>{w.orderNum=i+1;});});
+}
+
+function orchStartDrag(item,kind,e){
+  const ni={...item,id:oNid++,screenX:e.clientX,screenY:e.clientY};
+  if(kind==='string'){ni.names=[...item.names];oBankStr=oBankStr.filter(d=>d.id!==item.id);}
+  else{ni.name=item.name||'';ni.partnerId=null;ni.orderNum=0;oBankWnd=oBankWnd.filter(d=>d.id!==item.id);}
+  orchBuildBank();oDragItem=ni;oDragKind=kind;oIsDrag=true;document.getElementById('orch-trash').classList.add('active');
+
+  const onM=ev=>{oDragItem.screenX=ev.clientX;oDragItem.screenY=ev.clientY;orchDraw();};
+  const onU=ev=>{
+    document.removeEventListener('mousemove',onM);document.removeEventListener('mouseup',onU);
+    document.getElementById('orch-trash').classList.remove('active');oIsDrag=false;
+    const rect=oc.getBoundingClientRect();const mx=ev.clientX-rect.left,my=ev.clientY-rect.top;
+    if(my>=oH-50){oDragItem=null;oDragKind=null;orchDraw();return;}
+    if(mx>=0&&mx<=oW&&my>=0){
+      if(oDragKind==='string')oDesks.push({id:oDragItem.id,section:oDragItem.section,x:mx,y:my,names:oDragItem.names,color:oDragItem.color,cs:oDragItem.cs||20});
+      else{oWinds.push({id:oDragItem.id,section:oDragItem.section,x:mx,y:my,name:oDragItem.name,color:oDragItem.color,partnerId:null,cs:oDragItem.cs||18,orderNum:0});orchRecompute();}
+    } else {
+      if(oDragKind==='string')oBankStr.push({id:oBnid++,section:oDragItem.section,names:[...oDragItem.names],color:oDragItem.color,cs:oDragItem.cs});
+      else oBankWnd.push({id:oBnid++,section:oDragItem.section,name:oDragItem.name,color:oDragItem.color,cs:oDragItem.cs});
+      orchBuildBank();
+    }
+    oDragItem=null;oDragKind=null;orchDraw();
+  };
+  document.addEventListener('mousemove',onM);document.addEventListener('mouseup',onU);
+}
+
+// Orchestra mouse handlers
+function orchDown(e){
+  if(e.button!==0)return;const r=oc.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+  orchCloseEditor();
+  let rh={x:oCx,y:oCy-oR};if(Math.hypot(mx-rh.x,my-rh.y)<14){oDragR=true;oIsDrag=true;return;}
+  const ba=(oBounds[2]+oBounds[4])/2;let bh={x:oCx+Math.cos(ba)*oBassR,y:oCy-Math.sin(ba)*oBassR};
+  if(Math.hypot(mx-bh.x,my-bh.y)<14){oDragB=true;oIsDrag=true;return;}
+  for(let i=1;i<oBounds.length-1;i++){const hx=oCx+Math.cos(oBounds[i])*oR,hy=oCy-Math.sin(oBounds[i])*oR;if(Math.hypot(mx-hx,my-hy)<12){oDragH=i;return;}}
+  for(let i=oDesks.length-1;i>=0;i--){const d=oDesks[i];if(Math.hypot(mx-d.x,my-d.y)<(d.cs||20)*1.3){oDragPlaced=d;oDragPKind='string';oDragOff.x=mx-d.x;oDragOff.y=my-d.y;oDesks.splice(i,1);oDesks.push(d);oIsDrag=true;document.getElementById('orch-trash').classList.add('active');orchDraw();return;}}
+  for(let i=oWinds.length-1;i>=0;i--){const w=oWinds[i];if(Math.hypot(mx-w.x,my-w.y)<(w.cs||18)*0.9){oDragPlaced=w;oDragPKind='wind';oDragOff.x=mx-w.x;oDragOff.y=my-w.y;oWinds.splice(i,1);oWinds.push(w);oIsDrag=true;document.getElementById('orch-trash').classList.add('active');orchDraw();return;}}
+}
+function orchMove(e){
+  const r=oc.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+  if(oDragR){const dy=oCy-my;oR=Math.max(100,Math.min(Math.min(oW*0.48,(oH-50)*0.9),dy));if(oBassR>oR-30)oBassR=oR-30;orchDraw();return;}
+  if(oDragB){const d=Math.sqrt((mx-oCx)**2+(my-oCy)**2);oBassR=Math.max(50,Math.min(oR-30,d));orchDraw();return;}
+  if(oDragH>=0){const a=Math.atan2(oCy-my,mx-oCx);oBounds[oDragH]=Math.max(oBounds[oDragH+1]+0.05,Math.min(oBounds[oDragH-1]-0.05,a));orchDraw();return;}
+  if(oDragPlaced){oDragPlaced.x=mx-oDragOff.x;oDragPlaced.y=my-oDragOff.y;document.getElementById('orch-trash').classList.toggle('active',my>=oH-50);orchDraw();return;}
+  // Hover
+  let rh={x:oCx,y:oCy-oR};oHovR=Math.hypot(mx-rh.x,my-rh.y)<14;
+  const ba=(oBounds[2]+oBounds[4])/2;let bh={x:oCx+Math.cos(ba)*oBassR,y:oCy-Math.sin(ba)*oBassR};oHovB=Math.hypot(mx-bh.x,my-bh.y)<14;
+  let nh=-1;for(let i=1;i<oBounds.length-1;i++){const hx=oCx+Math.cos(oBounds[i])*oR,hy=oCy-Math.sin(oBounds[i])*oR;if(Math.hypot(mx-hx,my-hy)<12){nh=i;break;}}
+  let ni=-1,nk=null;
+  for(let i=oDesks.length-1;i>=0;i--){if(Math.hypot(mx-oDesks[i].x,my-oDesks[i].y)<(oDesks[i].cs||20)*1.3){ni=oDesks[i].id;nk='string';break;}}
+  if(ni<0)for(let i=oWinds.length-1;i>=0;i--){if(Math.hypot(mx-oWinds[i].x,my-oWinds[i].y)<(oWinds[i].cs||18)*0.9){ni=oWinds[i].id;nk='wind';break;}}
+  oHovH=nh;oHovI=ni;oHovK=nk;
+  oc.style.cursor=oHovR||oHovB?'ns-resize':oHovH>=0?'grab':oHovI>=0?'move':'default';
+  orchDraw();
+  const tt=document.getElementById('orch-tooltip');
+  if(oHovI>=0&&!oIsDrag){let d=oHovK==='string'?oDesks.find(dd=>dd.id===oHovI):oWinds.find(dd=>dd.id===oHovI);if(d){const ns=d.names?d.names.filter(n=>n).join(', '):(d.name||'');tt.textContent=d.section+(d.orderNum?' #'+d.orderNum:'')+': '+(ns||'(unnamed)');tt.style.left=(e.clientX+14)+'px';tt.style.top=(e.clientY-10)+'px';tt.style.display='block';}}else tt.style.display='none';
+}
+function orchUp(e){
+  const r=oc.getBoundingClientRect();const my=e.clientY-r.top;
+  if(oDragR){oDragR=false;oIsDrag=false;orchDraw();return;}
+  if(oDragB){oDragB=false;oIsDrag=false;orchDraw();return;}
+  if(oDragH>=0){oDragH=-1;orchDraw();return;}
+  if(oDragPlaced){
+    if(my>=oH-50){
+      if(oDragPKind==='wind'&&oDragPlaced.partnerId){const p=oWinds.find(w=>w.id===oDragPlaced.partnerId);if(p)p.partnerId=null;}
+      if(oDragPKind==='string')oDesks=oDesks.filter(d=>d.id!==oDragPlaced.id);else{oWinds=oWinds.filter(d=>d.id!==oDragPlaced.id);orchRecompute();}
+    }
+    oDragPlaced=null;oDragPKind=null;oIsDrag=false;document.getElementById('orch-trash').classList.remove('active');orchDraw();
+  }
+}
+function orchDbl(e){
+  const r=oc.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+  for(let i=oDesks.length-1;i>=0;i--){if(Math.hypot(mx-oDesks[i].x,my-oDesks[i].y)<(oDesks[i].cs||20)*1.3){orchOpenEditor(oDesks[i],'string',e.clientX,e.clientY);return;}}
+  for(let i=oWinds.length-1;i>=0;i--){if(Math.hypot(mx-oWinds[i].x,my-oWinds[i].y)<(oWinds[i].cs||18)*0.9){orchOpenEditor(oWinds[i],'wind',e.clientX,e.clientY);return;}}
+}
+
+function orchOpenEditor(item,kind,px,py){
+  const ed=document.getElementById('orch-name-editor');const f=document.getElementById('one-fields');f.innerHTML='';
+  if(kind==='string'){
+    document.getElementById('one-title').textContent=item.section+' Desk';
+    item.names.forEach((n,i)=>{const row=document.createElement('div');row.className='ne-row';const l=document.createElement('label');l.textContent=i?'Inside:':'Outside:';const inp=document.createElement('input');inp.type='text';inp.value=n;inp.addEventListener('input',()=>{item.names[i]=inp.value;orchDraw();});row.appendChild(l);row.appendChild(inp);f.appendChild(row);});
+    orchAddSizeEd(f,item,20);
+  } else {
+    document.getElementById('one-title').textContent=item.section+' #'+(item.orderNum||'?');
+    const row=document.createElement('div');row.className='ne-row';const l=document.createElement('label');l.textContent='Name:';const inp=document.createElement('input');inp.type='text';inp.value=item.name||'';inp.addEventListener('input',()=>{item.name=inp.value;orchDraw();});row.appendChild(l);row.appendChild(inp);f.appendChild(row);
+    orchAddSizeEd(f,item,18);
+    const s2=document.createElement('div');s2.className='ne-section';const st=document.createElement('div');st.className='ne-section-title';st.textContent='Stand Sharing';s2.appendChild(st);
+    if(item.partnerId!=null){const p=oWinds.find(w=>w.id===item.partnerId);const info=document.createElement('div');info.style.cssText='font-size:11px;color:#555;margin-bottom:4px';info.textContent='Sharing with: '+(p?(p.name||p.section+' #'+p.orderNum):'?');s2.appendChild(info);const ub=document.createElement('button');ub.textContent='✕ Unlink';ub.style.cssText='color:#c00;border-color:#c00';ub.addEventListener('click',()=>{if(p)p.partnerId=null;item.partnerId=null;orchCloseEditor();orchDraw();});s2.appendChild(ub);}
+    else{const cands=oWinds.filter(w=>w.id!==item.id&&w.partnerId==null).map(w=>({w,d:Math.hypot(w.x-item.x,w.y-item.y)})).sort((a,b)=>a.d-b.d).slice(0,5);if(cands.length){const pl=document.createElement('div');pl.style.cssText='font-size:11px;color:#555;margin-bottom:4px';pl.textContent='Share with:';s2.appendChild(pl);cands.forEach(({w})=>{const btn=document.createElement('button');btn.textContent=(w.name||w.section)+' #'+w.orderNum;btn.style.cssText='display:block;margin:2px 0;width:100%;text-align:left';btn.addEventListener('click',()=>{item.partnerId=w.id;w.partnerId=item.id;orchCloseEditor();orchDraw();});s2.appendChild(btn);});}else{const h=document.createElement('div');h.style.cssText='font-size:10px;color:#999';h.textContent='Place another wind player nearby.';s2.appendChild(h);}}
+    f.appendChild(s2);
+  }
+  ed.style.left=Math.min(px,window.innerWidth-290)+'px';ed.style.top=Math.min(py,window.innerHeight-300)+'px';ed.style.display='block';
+}
+function orchAddSizeEd(f,item,def){const s=document.createElement('div');s.className='ne-section';const t=document.createElement('div');t.className='ne-section-title';t.textContent='Chair Size';s.appendChild(t);const r=document.createElement('div');r.className='ne-row';const l=document.createElement('label');l.textContent='Size:';const i=document.createElement('input');i.type='number';i.value=item.cs||def;i.min=10;i.max=40;i.addEventListener('input',()=>{item.cs=parseInt(i.value)||def;orchDraw();});r.appendChild(l);r.appendChild(i);s.appendChild(r);f.appendChild(s);}
+function orchCloseEditor(){document.getElementById('orch-name-editor').style.display='none';}
+
+// Orchestra drawing
+function orchDraw(){
+  if(!octx||currentMode!=='orchestra')return;
+  const ss=document.getElementById('o-stands').checked,sn=document.getElementById('o-numbers').checked,sl=document.getElementById('o-labels').checked,si=document.getElementById('o-tags').checked;
+  const title=document.getElementById('orch-title').value;
+  octx.clearRect(0,0,oW,oH);octx.fillStyle='#FAFAFA';octx.fillRect(0,0,oW,oH-50);octx.fillStyle='#f8e8e8';octx.fillRect(0,oH-50,oW,50);
+  octx.fillStyle='#333';octx.font='bold 18px sans-serif';octx.textAlign='center';octx.textBaseline='top';octx.fillText(title,oW/2,8);
+  orchDrawSections(sl);if(ss)orchDrawLinks();
+  oDesks.forEach(d=>orchDrawDesk(d.x,d.y,d,ss,sn,d.id===oHovI&&oHovK==='string'));
+  orchDrawWinds(ss,sn,si);orchDrawHandles();orchDrawConductor();
+  if(oDragItem){const r=oc.getBoundingClientRect();const mx=oDragItem.screenX-r.left,my=oDragItem.screenY-r.top;octx.globalAlpha=0.55;if(oDragKind==='string')orchDrawDesk(mx,my,oDragItem,ss,false,false);else orchDrawWind(mx,my,oDragItem,true,false,false,false);octx.globalAlpha=1;}
+}
+
+function orchDrawSections(sl){
+  const cx=oCx,cy=oCy;
+  for(let i=0;i<4;i++){const a1=oBounds[i],a2=oBounds[i+1],col=oSecColors[i],isBk=(i===2||i===3);
+    octx.beginPath();octx.moveTo(cx,cy);octx.arc(cx,cy,isBk?oBassR:oR,-a1,-a2,false);octx.closePath();octx.fillStyle=col+'15';octx.fill();octx.strokeStyle=col+'40';octx.lineWidth=1;octx.stroke();
+    octx.setLineDash([4,4]);octx.strokeStyle='#bbb';octx.lineWidth=1;octx.beginPath();octx.moveTo(cx,cy);octx.lineTo(cx+Math.cos(a1)*oR,cy-Math.sin(a1)*oR);octx.stroke();if(i===3){octx.beginPath();octx.moveTo(cx,cy);octx.lineTo(cx+Math.cos(a2)*oR,cy-Math.sin(a2)*oR);octx.stroke();}octx.setLineDash([]);
+    if(sl){const ma=(a1+a2)/2,lr=(isBk?oBassR:oR)*0.55;const lx=cx+Math.cos(ma)*lr,ly=cy-Math.sin(ma)*lr;octx.font='bold 13px sans-serif';octx.textAlign='center';octx.textBaseline='middle';const tw=octx.measureText(oSecNames[i]).width+14;octx.fillStyle=col+'30';octx.beginPath();rr(octx,lx-tw/2,ly-11,tw,22,4);octx.fill();octx.strokeStyle=col;octx.lineWidth=1.5;octx.stroke();octx.fillStyle=dk(col,0.3);octx.fillText(oSecNames[i],lx,ly);}
+  }
+  const ba1=oBounds[2],ba2=oBounds[4],bc=OC['Bass'];
+  octx.beginPath();octx.arc(cx,cy,oR,-ba1,-ba2,false);octx.arc(cx,cy,oBassR,-ba2,-ba1,true);octx.closePath();octx.fillStyle=bc+'15';octx.fill();octx.strokeStyle=bc+'40';octx.lineWidth=1;octx.stroke();
+  octx.beginPath();octx.arc(cx,cy,oBassR,-ba1,-ba2,false);octx.strokeStyle=bc+'60';octx.lineWidth=2;octx.setLineDash([6,4]);octx.stroke();octx.setLineDash([]);
+  if(sl){const ma=(ba1+ba2)/2,lr=(oBassR+oR)/2;const lx=cx+Math.cos(ma)*lr,ly=cy-Math.sin(ma)*lr;octx.font='bold 13px sans-serif';octx.textAlign='center';octx.textBaseline='middle';const tw=octx.measureText('Bass').width+14;octx.fillStyle=bc+'30';octx.beginPath();rr(octx,lx-tw/2,ly-11,tw,22,4);octx.fill();octx.strokeStyle=bc;octx.lineWidth=1.5;octx.stroke();octx.fillStyle=dk(bc,0.3);octx.fillText('Bass',lx,ly);}
+  octx.beginPath();octx.arc(cx,cy,oR,-Math.PI,0,false);octx.strokeStyle='#999';octx.lineWidth=2;octx.stroke();
+}
+
+function orchDrawHandles(){
+  for(let i=1;i<oBounds.length-1;i++){const a=oBounds[i],hx=oCx+Math.cos(a)*oR,hy=oCy-Math.sin(a)*oR,hot=(oHovH===i)||(oDragH===i);octx.beginPath();octx.arc(hx,hy,hot?10:8,0,Math.PI*2);octx.fillStyle=hot?'#ff6b35':'#fff';octx.fill();octx.strokeStyle=hot?'#cc4400':'#888';octx.lineWidth=2;octx.stroke();octx.strokeStyle=hot?'#cc4400':'#aaa';octx.lineWidth=1;for(let j=-2;j<=2;j++){octx.beginPath();octx.moveTo(hx-4,hy+j*3);octx.lineTo(hx+4,hy+j*3);octx.stroke();}}
+  // Radius handle
+  let rh={x:oCx,y:oCy-oR};octx.save();octx.translate(rh.x,rh.y);octx.beginPath();octx.moveTo(0,-12);octx.lineTo(10,0);octx.lineTo(0,12);octx.lineTo(-10,0);octx.closePath();octx.fillStyle=oDragR||oHovR?'#ff6b35':'#fff';octx.fill();octx.strokeStyle=oDragR||oHovR?'#cc4400':'#666';octx.lineWidth=2;octx.stroke();octx.restore();
+  // Bass handle
+  const ba=(oBounds[2]+oBounds[4])/2;let bh={x:oCx+Math.cos(ba)*oBassR,y:oCy-Math.sin(ba)*oBassR};octx.save();octx.translate(bh.x,bh.y);octx.beginPath();octx.moveTo(0,-12);octx.lineTo(10,0);octx.lineTo(0,12);octx.lineTo(-10,0);octx.closePath();octx.fillStyle=oDragB||oHovB?'#ff6b35':'#ffe0e0';octx.fill();octx.strokeStyle=oDragB||oHovB?'#cc4400':OC['Bass'];octx.lineWidth=2;octx.stroke();octx.restore();
+}
+
+function orchDrawConductor(){const pw=44,ph=32;octx.fillStyle='#2c2c2c';octx.strokeStyle='#111';octx.lineWidth=2;octx.beginPath();rr(octx,oCx-pw/2,oCy-ph-10,pw,ph,6);octx.fill();octx.stroke();octx.fillStyle='#ddd';octx.font='bold 11px sans-serif';octx.textAlign='center';octx.textBaseline='middle';octx.fillText('Conductor',oCx,oCy-ph/2-10);}
+
+function orchDrawDesk(x,y,d,ss,sn,hov){
+  const cs=d.cs||20,pg=cs*0.2,si=cs*0.75;const dx=x-oCx,dy=y-oCy,ra=Math.atan2(-dy,dx);
+  const tx=-Math.sin(ra),ty=-Math.cos(ra),nm=Math.sqrt(tx*tx+ty*ty)||1,ux=tx/nm,uy=ty/nm,off=(cs+pg)/2;
+  const p1x=x+ux*off,p1y=y+uy*off,p2x=x-ux*off,p2y=y-uy*off;
+  const f1=Math.atan2(oCy-p1y,oCx-p1x),f2=Math.atan2(oCy-p2y,oCx-p2x);
+  drawChair(octx,p1x,p1y,cs,d.color,d.color+'30',d.names[0]||'',1,sn,f1,hov);
+  drawChair(octx,p2x,p2y,cs,d.color,d.color+'30',d.names[1]||'',2,sn,f2,hov);
+  if(ss){const dist=Math.sqrt(dx*dx+dy*dy),sr=dist-si;const sx=oCx+Math.cos(ra)*sr,sy=oCy-Math.sin(ra)*sr;drawStand(octx,sx,sy,cs,ra);}
+}
+
+function orchDrawLinks(){const dn=new Set();oWinds.forEach(w=>{if(w.partnerId!=null&&!dn.has(w.id)){const p=oWinds.find(pp=>pp.id===w.partnerId);if(p){dn.add(w.id);dn.add(p.id);octx.beginPath();octx.moveTo(w.x,w.y);octx.lineTo(p.x,p.y);octx.strokeStyle='rgba(0,0,0,0.1)';octx.lineWidth=2;octx.setLineDash([3,3]);octx.stroke();octx.setLineDash([]);}}});}
+
+function orchDrawWinds(ss,sn,si){
+  const linked=new Set(),ds=new Set();oWinds.forEach(w=>{if(w.partnerId!=null)linked.add(w.id);});
+  oWinds.forEach(w=>{const hov=(w.id===oHovI&&oHovK==='wind');orchDrawWind(w.x,w.y,w,ss&&!linked.has(w.id),sn,hov,si);});
+  if(ss){oWinds.forEach(w=>{if(w.partnerId!=null&&!ds.has(w.id)){const p=oWinds.find(pp=>pp.id===w.partnerId);if(p){ds.add(w.id);ds.add(p.id);const mx2=(w.x+p.x)/2,my2=(w.y+p.y)/2,dx2=mx2-oCx,dy2=my2-oCy,ra2=Math.atan2(-dy2,dx2),dist2=Math.sqrt(dx2*dx2+dy2*dy2),bcs=Math.max(w.cs||18,p.cs||18),sr2=dist2-bcs*0.75,sx2=oCx+Math.cos(ra2)*sr2,sy2=oCy-Math.sin(ra2)*sr2;drawStand(octx,sx2,sy2,bcs*1.3,ra2);}}});}
+}
+
+function orchDrawWind(x,y,w,ss,sn,hov,si){
+  const cs=w.cs||18,inset=cs*0.75;const dx=x-oCx,dy=y-oCy,ra=Math.atan2(-dy,dx),facing=Math.atan2(oCy-y,oCx-x);
+  drawChair(octx,x,y,cs,w.color,w.color+'30',w.name||'',w.orderNum||0,sn,facing,hov);
+  if(ss){const dist=Math.sqrt(dx*dx+dy*dy),sr=dist-inset;const sx=oCx+Math.cos(ra)*sr,sy=oCy-Math.sin(ra)*sr;drawStand(octx,sx,sy,cs,ra);}
+  if(si){const td=cs*0.9,tx2=x-Math.cos(facing)*td,ty2=y-Math.sin(facing)*td;const ab=wAbbr(w.section);octx.font=`bold ${Math.max(8,cs*0.4)}px sans-serif`;octx.textAlign='center';octx.textBaseline='middle';const tw=octx.measureText(ab).width+6,th=Math.max(10,cs*0.45);octx.fillStyle=w.color+'40';octx.beginPath();rr(octx,tx2-tw/2,ty2-th/2,tw,th,3);octx.fill();octx.fillStyle=dk(w.color,0.35);octx.fillText(ab,tx2,ty2);}
+}
+
+function orchSave(){const d={title:document.getElementById('orch-title').value,oR,oBassR,oBounds,oSecNames,oSecColors,oDesks,oWinds,oBankStr,oBankWnd,opts:{ss:document.getElementById('o-stands').checked,sn:document.getElementById('o-numbers').checked,sl:document.getElementById('o-labels').checked,si:document.getElementById('o-tags').checked}};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='orchestra-chart.json';a.click();}
+function orchLoad(){document.getElementById('orch-load-file').click();}
+function orchOnLoad(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=function(ev){try{const d=JSON.parse(ev.target.result);document.getElementById('orch-title').value=d.title||'';oR=d.oR||oR;oBassR=d.oBassR||oBassR;oBounds=d.oBounds||oBounds;oSecNames=d.oSecNames||oSecNames;oSecColors=d.oSecColors||oSecColors;oDesks=d.oDesks||[];oWinds=d.oWinds||[];oBankStr=d.oBankStr||[];oBankWnd=d.oBankWnd||[];oNid=Math.max(...oDesks.map(dd=>dd.id),...oWinds.map(dd=>dd.id),0)+1;oBnid=Math.max(...oBankStr.map(dd=>dd.id),...oBankWnd.map(dd=>dd.id),0)+1;if(d.opts){document.getElementById('o-stands').checked=d.opts.ss!==false;document.getElementById('o-numbers').checked=d.opts.sn!==false;document.getElementById('o-labels').checked=d.opts.sl!==false;document.getElementById('o-tags').checked=d.opts.si!==false;}orchRecompute();orchBuildBank();orchDraw();}catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';}
+function orchClear(){if(!confirm('Return all to bank?'))return;oDesks.forEach(d=>{oBankStr.push({id:oBnid++,section:d.section,names:[...d.names],color:d.color,cs:d.cs});});oWinds.forEach(w=>{oBankWnd.push({id:oBnid++,section:w.section,name:w.name,color:w.color,cs:w.cs});});oDesks=[];oWinds=[];orchBuildBank();orchDraw();}
+
+// ============================================================
+// ██     ██ ██ ███    ██ ██████
+// ██     ██ ██ ████   ██ ██   ██
+// ██  █  ██ ██ ██ ██  ██ ██   ██
+// ██ ███ ██ ██ ██  ██ ██ ██   ██
+//  ███ ███  ██ ██   ████ ██████
+//
+// Wind Ensemble — bgreco-style row-based semicircular layout
+// ============================================================
+let wCanvas,wCtx;
+let wRows=[
+  {chairs:8,labels:[],hidden:[]},
+  {chairs:10,labels:[],hidden:[]},
+  {chairs:12,labels:[],hidden:[]},
+  {chairs:14,labels:[],hidden:[]},
+];
+// stands[rowIdx] = Set of stand slot indices that are ON
+let wStands=[];
+
+function windInit(){
+  wCanvas=document.getElementById('wind-canvas');wCtx=wCanvas.getContext('2d');
+  wCanvas.addEventListener('click',windClick);
+  wStands=wRows.map(r=>{const s=new Set();for(let i=0;i<r.chairs-1;i++)s.add(i);return s;});
+  document.getElementById('wind-title').addEventListener('input',windDraw);
+  document.getElementById('wind-notes').addEventListener('input',windDraw);
+  document.getElementById('wind-load-file').addEventListener('change',windOnLoad);
+  windBuildPanels();windDraw();
+}
+
+function windBuildPanels(){
+  const c=document.getElementById('wind-row-panels');c.innerHTML='';
+  wRows.forEach((row,i)=>{
+    const p=document.createElement('div');p.className='wind-row-panel';
+    p.innerHTML=`<div class="wrp-header" onclick="windTogglePanel(${i})"><h4>Row ${i+1}: ${row.chairs} chairs</h4><button class="wrp-remove" onclick="event.stopPropagation();windRemoveRow(${i})">✕</button></div>
+    <div class="wrp-body"><label>Chairs:</label><input type="number" value="${row.chairs}" min="1" max="30" onchange="wRows[${i}].chairs=parseInt(this.value)||1;windEnsureStands(${i});windBuildPanels();windDraw()">
+    <label style="margin-top:4px">Labels (one per line):</label><textarea onchange="wRows[${i}].labels=this.value.split('\\n');windDraw()">${(row.labels||[]).join('\n')}</textarea></div>`;
+    c.appendChild(p);
+  });
+}
+
+function windTogglePanel(i){document.querySelectorAll('.wind-row-panel')[i].classList.toggle('open');}
+function windRemoveRow(i){wRows.splice(i,1);wStands.splice(i,1);windBuildPanels();windDraw();}
+function windAddRow(){wRows.push({chairs:10,labels:[],hidden:[]});wStands.push(new Set([...Array(9).keys()]));windBuildPanels();windDraw();}
+function windEnsureStands(i){const s=new Set();for(let j=0;j<wRows[i].chairs-1;j++)if(wStands[i]&&wStands[i].has(j))s.add(j);wStands[i]=s;}
+
+function windDraw(){
+  if(!wCtx||currentMode!=='wind')return;
+  const W=wCanvas.width,H=wCanvas.height;
+  const showNums=document.getElementById('w-numbers').checked;
+  const restartNums=document.getElementById('w-restart-nums').checked;
+  const rowLetters=document.getElementById('w-row-letters').checked;
+  const showStands=document.getElementById('w-stands').checked;
+  const flipped=document.getElementById('w-flip').checked;
+  const straight=document.getElementById('w-straight').value/100;
+  const sizeScale=document.getElementById('w-size').value/100;
+
+  wCtx.clearRect(0,0,W,H);wCtx.fillStyle='#FAFAFA';wCtx.fillRect(0,0,W,H);
+
+  const cx=W/2,cy=H*0.92;
+  const chairSize=22*sizeScale;
+  const baseRadius=60*sizeScale;
+  const rowGap=(chairSize*2+8)*sizeScale;
+
+  wCtx.save();
+  if(flipped){wCtx.translate(W,H);wCtx.rotate(Math.PI);}
+
+  let globalNum=1;
+
+  wRows.forEach((row,ri)=>{
+    const radius=baseRadius+ri*rowGap;
+    const n=row.chairs;
+    if(restartNums)globalNum=1;
+    const hidden=row.hidden||[];
+
+    for(let ci=0;ci<n;ci++){
+      const isHidden=hidden.includes(ci);
+      // Position: blend between arc and straight line
+      const arcT=n>1?ci/(n-1):0.5;
+      const arcAngle=Math.PI-arcT*Math.PI;
+      const arcX=cx+Math.cos(arcAngle)*radius;
+      const arcY=cy-Math.sin(arcAngle)*radius;
+      const lineX=cx-radius+(2*radius*arcT);
+      const lineY=cy-radius;
+      const px=arcX*(1-straight)+lineX*straight;
+      const py=arcY*(1-straight)+lineY*straight;
+
+      const facing=Math.atan2(cy-py,cx-px);
+
+      if(isHidden){
+        // Draw grey placeholder (not printed)
+        wCtx.save();wCtx.translate(px,py);
+        wCtx.fillStyle='#ddd';wCtx.strokeStyle='#bbb';wCtx.lineWidth=1;
+        wCtx.fillRect(-chairSize/2,-chairSize/2,chairSize,chairSize);
+        wCtx.strokeRect(-chairSize/2,-chairSize/2,chairSize,chairSize);
+        wCtx.restore();
+      } else {
+        const label=(row.labels&&row.labels[ci])?row.labels[ci]:'';
+        const letter=rowLetters?String.fromCharCode(65+ri):'';
+        const numLabel=showNums?(letter+globalNum):'';
+        // Chair shape rotated, text upright
+        wCtx.save();wCtx.translate(px,py);wCtx.rotate(facing);
+        wCtx.beginPath();rr(wCtx,-chairSize/2,-chairSize/2,chairSize,chairSize,chairSize*0.2);
+        wCtx.fillStyle='#fff';wCtx.fill();wCtx.strokeStyle='#333';wCtx.lineWidth=2;wCtx.stroke();
+        wCtx.restore();
+        // Text upright
+        wCtx.save();wCtx.translate(px,py);wCtx.fillStyle='#333';wCtx.textAlign='center';wCtx.textBaseline='middle';
+        if(label&&label.trim()){wCtx.font=`${Math.max(7,chairSize*0.32)}px sans-serif`;wCtx.fillText(label.trim(),0,0);}
+        else if(numLabel){wCtx.font=`${Math.max(8,chairSize*0.38)}px sans-serif`;wCtx.fillText(numLabel,0,0);}
+        wCtx.restore();
+        globalNum++;
+      }
+
+      // Stand slots between chairs
+      if(showStands&&ci<n-1){
+        const nextT=n>1?(ci+1)/(n-1):0.5;
+        const nextArcAngle=Math.PI-nextT*Math.PI;
+        const nArcX=cx+Math.cos(nextArcAngle)*radius;
+        const nArcY=cy-Math.sin(nextArcAngle)*radius;
+        const nLineX=cx-radius+(2*radius*nextT);
+        const nLineY=cy-radius;
+        const npx=nArcX*(1-straight)+nLineX*straight;
+        const npy=nArcY*(1-straight)+nLineY*straight;
+
+        const smx=(px+npx)/2,smy=(py+npy)/2;
+        const standOn=wStands[ri]&&wStands[ri].has(ci);
+        // Stand slot indicator (small box — clickable area)
+        const slotSize=chairSize*0.35;
+        const sra=Math.atan2(-(smy-cy),smx-cx);
+
+        if(standOn){
+          // Draw actual stand
+          const standDist=Math.sqrt((smx-cx)**2+(smy-cy)**2);
+          const sr=standDist-chairSize*0.6;
+          const sx=cx+Math.cos(sra)*sr,sy=cy-Math.sin(sra)*sr;
+          drawStand(wCtx,sx,sy,chairSize,sra);
+        }
+        // Draw clickable slot indicator (hidden on print via CSS — we draw it faintly)
+        wCtx.fillStyle=standOn?'rgba(0,0,0,0.05)':'rgba(200,200,200,0.3)';
+        const sdx=smx-cx,sdy=smy-cy,sdist=Math.sqrt(sdx*sdx+sdy*sdy);
+        const ssx=cx+Math.cos(sra)*(sdist-chairSize*0.6),ssy=cy-Math.sin(sra)*(sdist-chairSize*0.6);
+        wCtx.fillRect(ssx-slotSize/2,ssy-slotSize/2,slotSize,slotSize);
+      }
+    }
+  });
+
+  // Conductor podium
+  const pw=44*sizeScale,ph=32*sizeScale;
+  wCtx.fillStyle='#2c2c2c';wCtx.strokeStyle='#111';wCtx.lineWidth=2;
+  wCtx.beginPath();rr(wCtx,cx-pw/2,cy-ph-10,pw,ph,6);wCtx.fill();wCtx.stroke();
+  wCtx.fillStyle='#ddd';wCtx.font=`bold ${11*sizeScale}px sans-serif`;wCtx.textAlign='center';wCtx.textBaseline='middle';
+  wCtx.fillText('Conductor',cx,cy-ph/2-10);
+
+  wCtx.restore();
+
+  document.getElementById('wind-title-display').textContent=document.getElementById('wind-title').value;
+  document.getElementById('wind-notes-display').textContent=document.getElementById('wind-notes').value;
+}
+
+function windClick(e){
+  const rect=wCanvas.getBoundingClientRect();
+  let mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  // Account for flip
+  if(document.getElementById('w-flip').checked){mx=wCanvas.width-mx;my=wCanvas.height-my;}
+
+  const W=wCanvas.width,H=wCanvas.height;
+  const cx=W/2,cy=H*0.92;
+  const sizeScale=document.getElementById('w-size').value/100;
+  const straight=document.getElementById('w-straight').value/100;
+  const chairSize=22*sizeScale;
+  const baseRadius=60*sizeScale;
+  const rowGap=(chairSize*2+8)*sizeScale;
+  const showStands=document.getElementById('w-stands').checked;
+
+  wRows.forEach((row,ri)=>{
+    const radius=baseRadius+ri*rowGap;
+    const n=row.chairs;
+    if(!row.hidden)row.hidden=[];
+
+    for(let ci=0;ci<n;ci++){
+      const arcT=n>1?ci/(n-1):0.5;
+      const arcAngle=Math.PI-arcT*Math.PI;
+      const arcX=cx+Math.cos(arcAngle)*radius,arcY=cy-Math.sin(arcAngle)*radius;
+      const lineX=cx-radius+(2*radius*arcT),lineY=cy-radius;
+      const px=arcX*(1-straight)+lineX*straight,py=arcY*(1-straight)+lineY*straight;
+
+      // Click on chair to toggle hidden
+      if(Math.hypot(mx-px,my-py)<chairSize*0.6){
+        const idx=row.hidden.indexOf(ci);
+        if(idx>=0)row.hidden.splice(idx,1);else row.hidden.push(ci);
+        windDraw();return;
+      }
+
+      // Click on stand slot to toggle
+      if(showStands&&ci<n-1){
+        const nextT=n>1?(ci+1)/(n-1):0.5;
+        const nArcAngle=Math.PI-nextT*Math.PI;
+        const nArcX=cx+Math.cos(nArcAngle)*radius,nArcY=cy-Math.sin(nArcAngle)*radius;
+        const nLineX=cx-radius+(2*radius*nextT),nLineY=cy-radius;
+        const npx=nArcX*(1-straight)+nLineX*straight,npy=nArcY*(1-straight)+nLineY*straight;
+        const smx=(px+npx)/2,smy=(py+npy)/2;
+        const sra=Math.atan2(-(smy-cy),smx-cx);
+        const sdist=Math.sqrt((smx-cx)**2+(smy-cy)**2);
+        const ssx=cx+Math.cos(sra)*(sdist-chairSize*0.6),ssy=cy-Math.sin(sra)*(sdist-chairSize*0.6);
+        if(Math.hypot(mx-ssx,my-ssy)<chairSize*0.4){
+          if(wStands[ri].has(ci))wStands[ri].delete(ci);else wStands[ri].add(ci);
+          windDraw();return;
+        }
+      }
+    }
+  });
+}
+
+function windSave(){
+  const d={title:document.getElementById('wind-title').value,notes:document.getElementById('wind-notes').value,rows:wRows,stands:wStands.map(s=>[...s]),
+    opts:{nums:document.getElementById('w-numbers').checked,restart:document.getElementById('w-restart-nums').checked,letters:document.getElementById('w-row-letters').checked,stands:document.getElementById('w-stands').checked,flip:document.getElementById('w-flip').checked,straight:document.getElementById('w-straight').value,size:document.getElementById('w-size').value}};
+  const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='wind-ensemble-chart.json';a.click();
+}
+function windLoadClick(){document.getElementById('wind-load-file').click();}
+function windOnLoad(e){
+  const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=function(ev){try{const d=JSON.parse(ev.target.result);
+    document.getElementById('wind-title').value=d.title||'';document.getElementById('wind-notes').value=d.notes||'';
+    wRows=d.rows||[];wStands=(d.stands||[]).map(s=>new Set(s));
+    if(d.opts){document.getElementById('w-numbers').checked=d.opts.nums!==false;document.getElementById('w-restart-nums').checked=!!d.opts.restart;document.getElementById('w-row-letters').checked=!!d.opts.letters;document.getElementById('w-stands').checked=d.opts.stands!==false;document.getElementById('w-flip').checked=!!d.opts.flip;document.getElementById('w-straight').value=d.opts.straight||0;document.getElementById('w-straight-val').textContent=d.opts.straight||0;document.getElementById('w-size').value=d.opts.size||100;document.getElementById('w-size-val').textContent=(d.opts.size||100)+'%';}
+    windBuildPanels();windDraw();
+  }catch(err){alert('Error: '+err.message);}};r.readAsText(f);e.target.value='';
+}
+
+// ============================================================
+// SHARED PRIMITIVES
+// ============================================================
+function drawChair(ctx,x,y,size,color,fill,label,num,showNum,facing,hov){
+  const s=size;ctx.save();ctx.translate(x,y);ctx.rotate(facing);ctx.beginPath();rr(ctx,-s/2,-s/2,s,s,s*0.2);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=hov?'#ff6b35':color;ctx.lineWidth=hov?3:2;ctx.stroke();ctx.restore();
+  ctx.save();ctx.translate(x,y);ctx.fillStyle='#333';ctx.textAlign='center';ctx.textBaseline='middle';
+  if(label&&label.trim()){const w=label.trim().split(' ');if(w.length>1&&label.length>6){ctx.font=`${Math.max(6,s*0.26)}px sans-serif`;ctx.fillText(w[0],0,-s*0.12);ctx.fillText(w.slice(1).join(' '),0,s*0.16);}else{ctx.font=`${Math.max(7,s*0.32)}px sans-serif`;ctx.fillText(label.trim(),0,0);}}
+  else if(showNum&&num){ctx.font=`${Math.max(8,s*0.38)}px sans-serif`;ctx.fillText(num,0,0);}
+  ctx.restore();
+}
+function drawStand(ctx,x,y,size,ra){ctx.save();ctx.translate(x,y);ctx.rotate(-ra+Math.PI/2);const l=size*0.8,s=size*0.14;ctx.fillStyle='#6b5b3e';ctx.strokeStyle='#4a3c28';ctx.lineWidth=1;ctx.fillRect(-l/2,-s/2,l,s);ctx.strokeRect(-l/2,-s/2,l,s);ctx.restore();}
+function rr(c,x,y,w,h,r){c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath();}
+function dk(hex,a){let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgb(${Math.floor(r*(1-a))},${Math.floor(g*(1-a))},${Math.floor(b*(1-a))})`;}
+function wAbbr(s){const m={'Flute':'Fl','Oboe':'Ob','Clarinet':'Cl','Bassoon':'Bn','Horn':'Hn','Trumpet':'Tpt','Trombone':'Tbn','Tuba':'Tba','Percussion':'Perc','Harp':'Hp','Piano':'Pno'};return m[s]||s.slice(0,3);}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('DOMContentLoaded',()=>{orchInit();windInit();});
+</script>
+</body>
+</html>
